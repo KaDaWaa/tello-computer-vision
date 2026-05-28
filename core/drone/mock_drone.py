@@ -8,6 +8,9 @@ class MockDrone(BaseDrone):
 
     def connect(self):
         print("MockDrone connected")
+        
+    def disconnect(self):
+        print("MockDrone disconnected")
 
     def takeoff(self):
             print("MockDrone taking off...")

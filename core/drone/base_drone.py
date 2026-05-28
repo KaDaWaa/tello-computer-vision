@@ -4,6 +4,10 @@ class BaseDrone(ABC):
     @abstractmethod
     def connect(self):
         pass
+    
+    @abstractmethod
+    def disconnect(self):
+        pass
 
     @abstractmethod
     def takeoff(self):

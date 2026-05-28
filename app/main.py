@@ -2,16 +2,24 @@ import cv2
 
 from core.drone.base_drone import BaseDrone
 from core.camera.base_camera import BaseCamera
+from core.vision.head_detection.head_box import HeadBox
+from core.vision.head_detection.head_detector import HeadDetector
 
 from .config import Config
 from core.types import DroneType, CameraType
+from app.drawing.draw_utils import draw_bboxes, FPSCounter, draw_fps
+import time
 
 def main(drone_type: DroneType = DroneType.MOCK):
     config = Config(drone_type)
     drone: BaseDrone = config.init_drone()
-    camera: BaseCamera = config.init_camera(drone)   
+    camera: BaseCamera = config.init_camera(drone) 
+    head_detector = HeadDetector()  
     
+    drone.connect()
     camera.start()
+    fps_counter = FPSCounter()
+
     try:
         drone.takeoff()
         while True:
@@ -20,6 +28,15 @@ def main(drone_type: DroneType = DroneType.MOCK):
             
             if frame is None:
                 continue
+
+            head_detections: list[HeadBox] = head_detector.detect(frame)
+
+            # draw detections and overlays before potential color conversion
+            if head_detections:
+                draw_bboxes(frame, head_detections)
+
+            fps_val = fps_counter.tick()
+            draw_fps(frame, fps_val)
 
             if config.camera_type == CameraType.TELLO:  
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)

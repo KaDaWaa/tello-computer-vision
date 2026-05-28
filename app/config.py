@@ -3,6 +3,7 @@ from djitellopy import tello
 
 from core.drone.base_drone import BaseDrone
 from core.drone.mock_drone import MockDrone
+from core.drone.tello_drone import TelloDrone
 from core.types import DroneType, CameraType
 
 
@@ -22,10 +23,7 @@ class Config:
         if self.drone_type == DroneType.MOCK:
             return MockDrone()
         elif self.drone_type == DroneType.TELLO:
-            from djitellopy import Tello
-            tello = Tello()
-            tello.connect()
-            return tello
+            return TelloDrone()
         
     def init_camera(self, drone: BaseDrone):
         if self.camera_type == CameraType.WEBCAM:
