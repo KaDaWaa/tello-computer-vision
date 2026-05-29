@@ -3,7 +3,10 @@ from typing import Iterable
 
 import cv2
 
+from core.vision.hand_gestures.gesture_result import GestureDetection
 from core.vision.head_detection.head_box import HeadBox
+from mediapipe.tasks.python.vision import drawing_utils, HandLandmarksConnections
+from mediapipe.tasks.python.vision.drawing_utils import DrawingSpec, RED_COLOR
 
 
 def draw_bboxes(frame, boxes: Iterable[HeadBox], color=(0, 255, 0), thickness=2, label_prefix="Head"):
@@ -31,7 +34,15 @@ def draw_text(frame, text: str, org=(10, 30), font_scale=0.6, color=(255, 255, 2
     cv2.putText(frame, text, (x, y), font, font_scale, color, thickness, cv2.LINE_AA)
     return frame
 
-
+def draw_gestures(frame, detections: Iterable[GestureDetection]):
+    """Draw MediaPipe-style landmarks and optional connections on the frame."""
+    for detection in detections:
+        drawing_utils.draw_landmarks(
+            frame,
+            detection.hand_landmarks,
+            HandLandmarksConnections.HAND_CONNECTIONS,
+            landmark_drawing_spec=DrawingSpec(color=RED_COLOR, thickness=2, circle_radius=2)),
+    
 class FPSCounter:
     """Simple FPS counter. Call `tick()` each loop and `fps` property to read value."""
 
@@ -57,4 +68,8 @@ class FPSCounter:
 
 def draw_fps(frame, fps: float, org=(10, 20), color=(0, 255, 255)):
     text = f"FPS: {fps:.1f}"
+    return draw_text(frame, text, org=org, font_scale=0.6, color=color, thickness=1, bg_color=(0, 0, 0))
+
+def draw_battery(frame, battery: int, org=(10, 50), color=(255, 255, 0)):
+    text = f"Battery: {battery}%"
     return draw_text(frame, text, org=org, font_scale=0.6, color=color, thickness=1, bg_color=(0, 0, 0))
