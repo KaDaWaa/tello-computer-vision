@@ -4,8 +4,9 @@ import cv2
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
-from .head_box import HeadBox
 
+from core.vision.bbox import BBox
+from mediapipe.tasks.python.vision.face_detector import FaceDetector, FaceDetectorOptions
 model_path = (
     Path(__file__).resolve().parent.parent / "models" / "mediapipe" / "blaze_face_full_range.tflite"
 )
@@ -26,7 +27,7 @@ class HeadDetector:
     def __init__(self):
         self.detector = FaceDetector.create_from_options(options)
 
-    def detect(self, image)-> list[HeadBox]:
+    def detect(self, image)-> list[BBox]:
         if not isinstance(image, mp.Image):
             image = mp.Image(
                 image_format=mp.ImageFormat.SRGB,
@@ -34,8 +35,8 @@ class HeadDetector:
             )
 
         results = self.detector.detect(image)
-        return [HeadBox(x=int(detection.bounding_box.origin_x),
+        return [BBox(x=int(detection.bounding_box.origin_x),
                         y=int(detection.bounding_box.origin_y),
-                        w=int(detection.bounding_box.width),
-                        h=int(detection.bounding_box.height))
-                        .expanded(1.2, 1.2) for detection in results.detections]
+                        width=int(detection.bounding_box.width),
+                        height=int(detection.bounding_box.height))
+                        .expanded(1.2, 1.2) for detection in results.detections] or []
