@@ -20,8 +20,18 @@ class TelloDrone(BaseDrone):
             finally:
                 self.is_connected = False    
 
+    def streamon(self):
+        self.tello.streamon()
+
+    def streamoff(self):
+        self.tello.streamoff()
+
+    def get_frame_read(self):
+        return self.tello.get_frame_read()
+
     def takeoff(self):
-            pass
+        self.tello.takeoff()
+        self.is_flying = True
 
     def land(self):
         if self.is_flying:
@@ -32,10 +42,25 @@ class TelloDrone(BaseDrone):
             
 
     def move(self, direction, distance):
-        self.tello.send_rc_control
+        try:
+            self.tello.move(direction, distance)
+        except Exception as exc:
+            print(f"Tello move '{direction} {distance}' failed: {exc}")
 
     def rotate(self, angle):
-        pass
+        if angle >= 0:
+            self.tello.rotate_clockwise(angle)
+        else:
+            self.tello.rotate_counter_clockwise(abs(angle))
+
+    def flip(self, direction):
+        try:
+            self.tello.flip(direction)
+        except Exception as exc:
+            print(f"Tello flip '{direction}' failed: {exc}")
+
+    def send_rc_control(self, left_right_velocity: int, forward_backward_velocity: int, up_down_velocity: int, yaw_velocity: int):
+        self.tello.send_rc_control(left_right_velocity, forward_backward_velocity, up_down_velocity, yaw_velocity)
 
     def get_battery(self):
-        pass
+        return self.tello.get_battery()
