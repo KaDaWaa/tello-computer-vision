@@ -57,7 +57,7 @@ class FollowController:
     RC_DEADBAND = 0
     TARGET_HEAD_HEIGHT_RATIO = 0.18
     ONE_SHOT_MOVE_LOCK_SECONDS = 1.2
-    ONE_SHOT_FLIP_LOCK_SECONDS = 0.8
+    ONE_SHOT_FLIP_LOCK_SECONDS = 5
 
     def __init__(self, state: State | None = None):
         self.state = state or State()

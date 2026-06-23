@@ -7,6 +7,15 @@ class BBox:
     width: int
     height: int
 
+    @classmethod
+    def from_detection(cls, detection) -> "BBox":
+        return cls(
+            x=int(detection.bounding_box.origin_x),
+            y=int(detection.bounding_box.origin_y),
+            width=int(detection.bounding_box.width),
+            height=int(detection.bounding_box.height)
+        )
+
     def contains_point(self, x: int, y: int) -> bool:
             return self.x <= x <= self.x + self.width and self.y <= y <= self.y + self.height
 
