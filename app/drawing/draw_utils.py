@@ -136,7 +136,6 @@ def render(
             else (0, 0, 255)
         )
         draw_bbox(frame, head.gesture_zone, color=gesture_zone_color, thickness=1)
-        # Optionally draw gesture zones or other info related to the head
 
     draw_gestures(frame, gesture_detections)
 
