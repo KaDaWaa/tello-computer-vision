@@ -18,16 +18,7 @@ class TelloDrone(BaseDrone):
                     self.land()
                 self.tello.end()
             finally:
-                self.is_connected = False    
-
-    def streamon(self):
-        self.tello.streamon()
-
-    def streamoff(self):
-        self.tello.streamoff()
-
-    def get_frame_read(self):
-        return self.tello.get_frame_read()
+                self.is_connected = False
 
     def takeoff(self):
         self.tello.takeoff()
@@ -64,3 +55,6 @@ class TelloDrone(BaseDrone):
 
     def get_battery(self):
         return self.tello.get_battery()
+    
+    def get_sdk_drone(self):
+        return self.tello

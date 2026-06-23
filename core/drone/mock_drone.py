@@ -39,3 +39,6 @@ class MockDrone(BaseDrone):
 
     def get_battery(self):
         return 100
+    
+    def get_sdk_drone(self):
+        return None

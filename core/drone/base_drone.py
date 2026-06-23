@@ -36,3 +36,7 @@ class BaseDrone(ABC):
     @abstractmethod
     def get_battery(self):
         pass
+    
+    @abstractmethod
+    def get_sdk_drone(self):
+        pass

@@ -31,5 +31,5 @@ class Config:
             return Webcam(self.webcam_width, self.webcam_height, self.webcam_src)
         elif self.camera_type == CameraType.TELLO:
             from core.camera.tello_camera import TelloCamera
-            return TelloCamera(drone)
+            return TelloCamera(drone.get_sdk_drone())
             
