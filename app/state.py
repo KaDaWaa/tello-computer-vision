@@ -36,8 +36,9 @@ class State:
             self.current_state = states.FOLLOWING
     
     def release_follow(self):
-        self.head_target_id = None
-        self.current_state = states.FLYING
+        if self.current_state == states.FOLLOWING:
+            self.head_target_id = None
+            self.current_state = states.FLYING
     
 
     # Takeoff and landing state management

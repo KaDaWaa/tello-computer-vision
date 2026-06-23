@@ -35,6 +35,8 @@ class _PID:
 class FollowController:
     CLOSED_FIST_GESTURES = {"closed_fist", "closedfist", "fist"}
     OPEN_HAND_GESTURES = {"open_palm", "open_hand", "openhand", "palm"}
+    FLIP_GESTURES = {"iloveyou", "i_love_you"}
+    LAND_GESTURES = {"victory", "peace", "v_sign", "v_sign_hand", "v_sign_gesture"}
     MOVE_GESTURES = {
         "thumb_up": ("up", 30),
         "thumbs_up": ("up", 30),
@@ -49,8 +51,6 @@ class FollowController:
         "pointing_right": ("right", 30),
         "point_right": ("right", 30),
     }
-    FLIP_GESTURES = {"iloveyou", "i_love_you"}
-    LAND_GESTURES = {"victory", "peace", "v_sign", "v_sign_hand", "v_sign_gesture"}
     TRANSITION_COOLDOWN_SECONDS = 0.45
     REQUIRED_STABLE_FRAMES = 3
     FOLLOW_RC_INTERVAL_SECONDS = 0.05
@@ -108,7 +108,7 @@ class FollowController:
         if self.state.current_state == states.FLYING and self._one_shot_action_locked(now):
             return self.state
 
-        if self.state in (states.FLYING, states.FOLLOWING):
+        if self.state.current_state in (states.FLYING, states.FOLLOWING):
             if self._gesture_ready(self.LAND_GESTURES, gesture_name):
                 self.state.release_follow()
                 self._register_transition(now)
@@ -122,9 +122,9 @@ class FollowController:
                 self._send_rc_control(drone, 0, 0, 0, 0, now, force=True)
                 return self.state
 
-            if target_head is not None:
+            if target_head is not None and self.state.is_following():
                 self._follow_target(drone, target_head, frame_width, frame_height, dt, now)
-            return self.state
+                return self.state
 
         if target_head is not None and self._gesture_ready(self.CLOSED_FIST_GESTURES, gesture_name) and self.state.current_state == states.FLYING:
             self.state.start_follow(target_head.id)
