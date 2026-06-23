@@ -29,7 +29,7 @@ class GestureDetector:
         
         image = mp.Image(
             image_format=mp.ImageFormat.SRGB,
-            data=cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+            data=image)
         
         results = self.recognizer.recognize(image)  
         detections = []

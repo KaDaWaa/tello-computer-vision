@@ -31,7 +31,7 @@ class HeadDetector:
         if not isinstance(image, mp.Image):
             image = mp.Image(
                 image_format=mp.ImageFormat.SRGB,
-                data=cv2.cvtColor(image, cv2.COLOR_BGR2RGB),
+                data=image
             )
 
         results = self.detector.detect(image)
