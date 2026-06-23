@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor, wait
+
 import cv2
 
 from core.drone.base_drone import BaseDrone
@@ -29,6 +31,7 @@ def main(drone_type: DroneType = DroneType.MOCK):
     camera.start()
     fps_counter = FPSCounter()
 
+    vision_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="VisionWorker")
     try:
         state.start_takeoff()
         drone.takeoff()
@@ -51,12 +54,16 @@ def main(drone_type: DroneType = DroneType.MOCK):
                 try:
                     battery_cache = drone.get_battery()
                 except Exception:
-                    battery_cache = None
+                    pass
                 last_battery_poll = now
 
-            head_tracker.update(head_detector.detect(frame), now)
-            gesture_results = gesture_detector.detect(frame)
+            heads_task = vision_executor.submit(head_detector.detect, frame)
+            gesture_task = vision_executor.submit(gesture_detector.detect, frame)
+            wait([heads_task, gesture_task])
             
+            head_tracker.update(heads_task.result(), now)
+            gesture_results = gesture_task.result()
+
             for head in head_tracker.tracked_heads:
                 head.contains_gesture(gesture_results, frame.shape[1], frame.shape[0])
 
@@ -93,7 +100,7 @@ def main(drone_type: DroneType = DroneType.MOCK):
                 break
     finally:
         if not state.is_idle():
+            state.set_idle()
             state.start_landing()
             drone.land()
         camera.stop()
-        state.set_idle()
