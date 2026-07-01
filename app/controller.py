@@ -35,7 +35,7 @@ class _PID:
 class FollowController:
     CLOSED_FIST_GESTURES = {"closed_fist", "closedfist", "fist"}
     OPEN_HAND_GESTURES = {"open_palm", "open_hand", "openhand", "palm"}
-    FLIP_GESTURES = {"iloveyou", "i_love_you"}
+    FLIP_GESTURES: set[str] = set()
     LAND_GESTURES = {"victory", "peace", "v_sign", "v_sign_hand", "v_sign_gesture"}
     MOVE_GESTURES = {
         "thumb_up": ("up", 30),

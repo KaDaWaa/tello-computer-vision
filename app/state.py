@@ -8,10 +8,38 @@ class states(Enum):
     TAKING_OFF = "taking_off"
     FOLLOWING = "following"
 
+class control_mode(Enum):
+    GESTURES = "gestures"
+    VOICE_COMMANDS = "voice commands"
+
 class State:
     def __init__(self):
+        self.control_mode = control_mode.GESTURES
         self.current_state = states.IDLE
         self.head_target_id: Optional[int] = None
+        self.voice_listening: bool = False
+        self.last_voice_command: str = ""
+
+    def toggle_mode(self):
+        """Switches the control mode between GESTURES and VOICE_COMMANDS.
+        
+        Allowed while IDLE or FLYING (not while FOLLOWING, TAKING_OFF, or LANDING).
+        """
+        if self.current_state not in (states.IDLE, states.FLYING):
+            return
+        if self.control_mode == control_mode.GESTURES:
+            self.control_mode = control_mode.VOICE_COMMANDS
+        else:
+            self.control_mode = control_mode.GESTURES
+            self.voice_listening = False
+            self.last_voice_command = ""
+
+    def is_voice_mode(self) -> bool:
+        return self.control_mode == control_mode.VOICE_COMMANDS
+
+    def get_mode(self):
+        """Returns the current control mode"""
+        return self.control_mode
     
     # Flight state helpers
     def is_idle(self):
