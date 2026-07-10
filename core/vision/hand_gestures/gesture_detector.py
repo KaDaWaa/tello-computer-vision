@@ -5,7 +5,7 @@ import mediapipe as mp
 from core.vision.hand_gestures.gesture_result import GestureDetection
 
 model_path = (
-    Path(__file__).resolve().parent.parent / "models" / "mediapipe" / "gesture_recognizer.task"
+    Path(__file__).resolve().parent.parent / "models" / "mediapipe" / "trained_gesture_recognizer.task"
 )
 
 BaseOptions = mp.tasks.BaseOptions

@@ -18,10 +18,6 @@ from .controller import FollowController
 from .state import State, control_mode
 from .voice_controller import VoiceController
 
-# Path to the downloaded Vosk model
-VOSK_MODEL_PATH = "core/voice/models/vosk-model-small-en-us-0.15"
-
-
 def _normalized_gesture(name: str | None) -> str:
     if not name:
         return ""
@@ -34,14 +30,14 @@ def main(drone_type: DroneType = DroneType.MOCK):
     camera: BaseCamera = config.init_camera(drone) 
 
     head_detector = HeadDetector()
-    head_tracker = HeadTracker()
     gesture_detector = GestureDetector()
+    voice_listener = VoiceListener()
+    
     state = State()
+    head_tracker = HeadTracker()
     gesture_controller = FollowController(state)
     voice_controller = VoiceController(state)
 
-    # Voice listener — initialized lazily (model loaded once, mic starts on toggle)
-    voice_listener = VoiceListener(VOSK_MODEL_PATH)
     
     drone.connect()
     camera.start()
