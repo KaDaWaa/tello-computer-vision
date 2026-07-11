@@ -40,7 +40,9 @@ def test_move_executes_only_while_flying() -> None:
 
     controller.state.set_flying()
     assert controller.handle(command, [], timestamp=11.0)
+    controller.wait_for_pending_action(timestamp=11.0)
     assert drone.moves == [("left", 30)]
+    controller.close()
 
 
 @pytest.mark.parametrize(
@@ -56,7 +58,9 @@ def test_rotation_converts_direction_to_signed_angle(
     assert controller.handle(
         AppCommand.rotate(direction, 90), [], timestamp=10.0
     )
+    controller.wait_for_pending_action(timestamp=10.0)
     assert drone.rotations == [expected_angle]
+    controller.close()
 
 
 @pytest.mark.parametrize(
@@ -75,20 +79,25 @@ def test_flip_converts_direction_to_tello_sdk_code(
     _, drone, controller = make_controller(flying=True)
 
     assert controller.handle(AppCommand.flip(direction), [], timestamp=10.0)
+    controller.wait_for_pending_action(timestamp=10.0)
     assert drone.flips == [sdk_direction]
+    controller.close()
 
 
-def test_post_flip_lock_blocks_flight_actions_for_three_seconds() -> None:
+def test_post_flip_lock_starts_when_flip_completes() -> None:
     _, drone, controller = make_controller(flying=True)
     move = AppCommand.move(Direction.UP, 30)
 
     assert controller.handle(AppCommand.flip(), [], timestamp=10.0)
-    assert not controller.handle(move, [], timestamp=12.99)
+    controller.wait_for_pending_action(timestamp=12.0)
+    assert not controller.handle(move, [], timestamp=13.24)
     assert drone.moves == []
     assert controller.last_rejection_reason == "flip recovery in progress"
 
-    assert controller.handle(move, [], timestamp=13.0)
+    assert controller.handle(move, [], timestamp=13.25)
+    controller.wait_for_pending_action(timestamp=13.25)
     assert drone.moves == [("up", 30)]
+    controller.close()
 
 
 def test_land_bypasses_post_flip_lock() -> None:
@@ -133,6 +142,35 @@ def test_takeoff_does_not_block_the_caller() -> None:
     controller.close()
 
 
+def test_overlapping_flight_actions_are_rejected() -> None:
+    started = Event()
+    release = Event()
+
+    class BlockingMoveDrone(RecordingDrone):
+        def move(self, direction: str, distance: int) -> None:
+            started.set()
+            release.wait()
+            super().move(direction, distance)
+
+    state = State()
+    state.set_flying()
+    drone = BlockingMoveDrone()
+    controller = FlightController(state, drone)
+
+    assert controller.handle(
+        AppCommand.move(Direction.FORWARD), [], timestamp=10.0
+    )
+    assert started.wait(timeout=1.0)
+    assert not controller.handle(
+        AppCommand.rotate(Direction.RIGHT), [], timestamp=11.0
+    )
+    assert controller.last_rejection_reason == "flight action in progress"
+
+    release.set()
+    controller.wait_for_pending_action(timestamp=11.0)
+    controller.close()
+
+
 @pytest.mark.parametrize(
     ("command", "initially_flying", "expected_state"),
     [
@@ -171,13 +209,16 @@ def test_action_cooldown_is_centralized_in_flight_controller() -> None:
     assert controller.handle(
         AppCommand.move(Direction.LEFT), [], timestamp=10.0
     )
+    controller.wait_for_pending_action(timestamp=10.0)
     assert not controller.handle(
         AppCommand.move(Direction.RIGHT), [], timestamp=10.2
     )
     assert controller.handle(
         AppCommand.move(Direction.RIGHT), [], timestamp=10.45
     )
+    controller.wait_for_pending_action(timestamp=10.45)
     assert drone.moves == [("left", 30), ("right", 30)]
+    controller.close()
 
 
 def test_follow_target_selection_is_owned_by_flight_controller() -> None:

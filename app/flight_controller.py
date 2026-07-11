@@ -15,7 +15,7 @@ class FlightController:
     """Validate and execute flight commands from any input source."""
 
     ACTION_COOLDOWN_SECONDS = 0.45
-    POST_FLIP_LOCK_SECONDS = 3.0
+    POST_FLIP_LOCK_SECONDS = 1.25
 
     FLIGHT_COMMANDS = {
         CommandType.TAKE_OFF,
@@ -72,17 +72,17 @@ class FlightController:
     def has_pending_action(self) -> bool:
         return self._pending_action is not None
 
-    def update(self) -> None:
+    def update(self, timestamp: float | None = None) -> None:
         """Apply a completed blocking flight action on the main thread."""
         if self._pending_action is None or not self._pending_action.done():
             return
-        self._finish_pending_action()
+        self._finish_pending_action(timestamp)
 
-    def wait_for_pending_action(self) -> None:
+    def wait_for_pending_action(self, timestamp: float | None = None) -> None:
         """Wait for an in-flight SDK command and apply its state transition."""
         if self._pending_action is None:
             return
-        self._finish_pending_action()
+        self._finish_pending_action(timestamp)
 
     def close(self) -> None:
         if self._closed:
@@ -112,6 +112,8 @@ class FlightController:
         if self._is_action_cooldown_locked(command, now):
             self.last_rejection_reason = "command cooldown"
             return False
+        if self.has_pending_action and command.type != CommandType.LAND:
+            return self._reject("flight action in progress")
 
         executed = self._dispatch(command, tracked_heads, now)
         if executed:
@@ -189,20 +191,32 @@ class FlightController:
             return self._reject(self._flight_state_rejection())
 
         if command.type == CommandType.MOVE:
-            self.drone.move(command.direction.value, command.amount)
+            self._submit_action(
+                command.type,
+                lambda: self.drone.move(
+                    command.direction.value,
+                    command.amount,
+                ),
+            )
             return True
 
         if command.type == CommandType.ROTATE:
             angle = command.amount
             if command.direction == Direction.LEFT:
                 angle = -angle
-            self.drone.rotate(angle)
+            self._submit_action(
+                command.type,
+                lambda: self.drone.rotate(angle),
+            )
             return True
 
         if command.type == CommandType.FLIP:
             self.follow_controller.stop(self.drone, now)
-            self.drone.flip(self.FLIP_DIRECTIONS[command.direction])
-            self._flight_actions_locked_until = now + self.post_flip_lock_seconds
+            sdk_direction = self.FLIP_DIRECTIONS[command.direction]
+            self._submit_action(
+                command.type,
+                lambda: self.drone.flip(sdk_direction),
+            )
             return True
 
         return False
@@ -216,7 +230,7 @@ class FlightController:
         self._pending_command = command
         self._pending_action = self._action_executor.submit(action)
 
-    def _finish_pending_action(self) -> None:
+    def _finish_pending_action(self, timestamp: float | None = None) -> None:
         future = self._pending_action
         command = self._pending_command
         if future is None or command is None:
@@ -227,16 +241,25 @@ class FlightController:
         except Exception as exc:
             self._complete_failed_action(command, exc)
         else:
-            self._complete_successful_action(command)
+            completed_at = timestamp if timestamp is not None else time()
+            self._complete_successful_action(command, completed_at)
 
         self._pending_action = None
         self._pending_command = None
 
-    def _complete_successful_action(self, command: CommandType) -> None:
+    def _complete_successful_action(
+        self,
+        command: CommandType,
+        completed_at: float,
+    ) -> None:
         if command == CommandType.TAKE_OFF:
             self.state.finish_takeoff()
         elif command == CommandType.LAND:
             self.state.set_idle()
+        elif command == CommandType.FLIP:
+            self._flight_actions_locked_until = (
+                completed_at + self.post_flip_lock_seconds
+            )
 
     def _complete_failed_action(
         self,

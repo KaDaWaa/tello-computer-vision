@@ -105,7 +105,7 @@ class ApplicationCoordinator:
             raise RuntimeError("ApplicationCoordinator is closed")
 
         now = timestamp if timestamp is not None else time()
-        self.flight_controller.update()
+        self.flight_controller.update(now)
         vision = self.vision_pipeline.process(frame, now)
         commands, detected_input = self._collect_commands(vision)
 

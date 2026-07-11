@@ -56,7 +56,7 @@ class FakeFlightController:
         self.update_calls = 0
         self.closed = False
 
-    def update(self) -> None:
+    def update(self, timestamp=None) -> None:
         self.update_calls += 1
 
     def close(self) -> None:
