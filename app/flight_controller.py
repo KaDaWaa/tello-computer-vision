@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from concurrent.futures import Future, ThreadPoolExecutor
 from time import time
+from typing import Callable
 
 from app.commands import AppCommand, CommandType, Direction
 from app.follow_controller import FollowController
@@ -56,7 +58,38 @@ class FlightController:
         self.post_flip_lock_seconds = post_flip_lock_seconds
         self._next_action_allowed_timestamp = float("-inf")
         self._flight_actions_locked_until = float("-inf")
+        self._action_executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="flight-action",
+        )
+        self._pending_action: Future[None] | None = None
+        self._pending_command: CommandType | None = None
+        self._closed = False
         self.last_rejection_reason: str | None = None
+        self.last_action_error: str | None = None
+
+    @property
+    def has_pending_action(self) -> bool:
+        return self._pending_action is not None
+
+    def update(self) -> None:
+        """Apply a completed blocking flight action on the main thread."""
+        if self._pending_action is None or not self._pending_action.done():
+            return
+        self._finish_pending_action()
+
+    def wait_for_pending_action(self) -> None:
+        """Wait for an in-flight SDK command and apply its state transition."""
+        if self._pending_action is None:
+            return
+        self._finish_pending_action()
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self.wait_for_pending_action()
+        self._action_executor.shutdown(wait=True, cancel_futures=False)
+        self._closed = True
 
     def handle(
         self,
@@ -122,8 +155,7 @@ class FlightController:
             if not self.state.is_idle():
                 return self._reject("drone is not idle")
             self.state.start_takeoff()
-            self.drone.takeoff()
-            self.state.finish_takeoff()
+            self._submit_action(command.type, self.drone.takeoff)
             return True
 
         if command.type == CommandType.LAND:
@@ -133,8 +165,7 @@ class FlightController:
                 self.follow_controller.stop(self.drone, now)
                 self.state.release_follow()
             self.state.start_landing()
-            self.drone.land()
-            self.state.set_idle()
+            self._submit_action(command.type, self.drone.land)
             return True
 
         if command.type == CommandType.START_FOLLOW:
@@ -175,6 +206,49 @@ class FlightController:
             return True
 
         return False
+
+    def _submit_action(
+        self,
+        command: CommandType,
+        action: Callable[[], None],
+    ) -> None:
+        self.last_action_error = None
+        self._pending_command = command
+        self._pending_action = self._action_executor.submit(action)
+
+    def _finish_pending_action(self) -> None:
+        future = self._pending_action
+        command = self._pending_command
+        if future is None or command is None:
+            return
+
+        try:
+            future.result()
+        except Exception as exc:
+            self._complete_failed_action(command, exc)
+        else:
+            self._complete_successful_action(command)
+
+        self._pending_action = None
+        self._pending_command = None
+
+    def _complete_successful_action(self, command: CommandType) -> None:
+        if command == CommandType.TAKE_OFF:
+            self.state.finish_takeoff()
+        elif command == CommandType.LAND:
+            self.state.set_idle()
+
+    def _complete_failed_action(
+        self,
+        command: CommandType,
+        error: Exception,
+    ) -> None:
+        self.last_action_error = str(error)
+        if command == CommandType.TAKE_OFF:
+            self.state.cancel_takeoff()
+        elif command == CommandType.LAND:
+            # Conservatively assume the drone may still be airborne.
+            self.state.set_flying()
 
     def _reject(self, reason: str) -> bool:
         self.last_rejection_reason = reason

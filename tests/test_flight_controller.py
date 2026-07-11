@@ -1,3 +1,5 @@
+from threading import Event
+
 import pytest
 
 from app.commands import AppCommand, Direction
@@ -20,9 +22,12 @@ def test_takeoff_executes_only_from_idle() -> None:
     state, drone, controller = make_controller()
 
     assert controller.handle(AppCommand.take_off(), [], timestamp=10.0)
+    assert state.is_taking_off()
+    controller.wait_for_pending_action()
     assert state.is_flying()
     assert drone.takeoff_calls == 1
     assert not controller.handle(AppCommand.take_off(), [], timestamp=11.0)
+    controller.close()
 
 
 def test_move_executes_only_while_flying() -> None:
@@ -92,8 +97,72 @@ def test_land_bypasses_post_flip_lock() -> None:
     assert controller.handle(AppCommand.flip(), [], timestamp=10.0)
     assert controller.handle(AppCommand.land(), [], timestamp=10.1)
 
+    assert state.is_landing()
+    controller.wait_for_pending_action()
     assert state.is_idle()
     assert drone.land_calls == 1
+    controller.close()
+
+
+def test_takeoff_does_not_block_the_caller() -> None:
+    started = Event()
+    release = Event()
+    completed = Event()
+
+    class BlockingTakeoffDrone(RecordingDrone):
+        def takeoff(self) -> None:
+            started.set()
+            release.wait()
+            super().takeoff()
+            completed.set()
+
+    state = State()
+    drone = BlockingTakeoffDrone()
+    controller = FlightController(state, drone)
+
+    assert controller.handle(AppCommand.take_off(), [], timestamp=10.0)
+    assert started.wait(timeout=1.0)
+    assert state.is_taking_off()
+    assert drone.takeoff_calls == 0
+
+    release.set()
+    assert completed.wait(timeout=1.0)
+    controller.update()
+    assert state.is_flying()
+    assert drone.takeoff_calls == 1
+    controller.close()
+
+
+@pytest.mark.parametrize(
+    ("command", "initially_flying", "expected_state"),
+    [
+        (AppCommand.take_off(), False, "idle"),
+        (AppCommand.land(), True, "flying"),
+    ],
+)
+def test_failed_async_action_restores_a_safe_state(
+    command: AppCommand,
+    initially_flying: bool,
+    expected_state: str,
+) -> None:
+    class FailingDrone(RecordingDrone):
+        def takeoff(self) -> None:
+            raise RuntimeError("takeoff failed")
+
+        def land(self) -> None:
+            raise RuntimeError("landing failed")
+
+    state = State()
+    if initially_flying:
+        state.set_flying()
+    controller = FlightController(state, FailingDrone())
+
+    assert controller.handle(command, [], timestamp=10.0)
+    controller.wait_for_pending_action()
+
+    assert state.current_state.value == expected_state
+    assert controller.last_action_error is not None
+    controller.close()
 
 
 def test_action_cooldown_is_centralized_in_flight_controller() -> None:

@@ -53,6 +53,14 @@ class FakeFlightController:
     def __init__(self) -> None:
         self.handled = []
         self.follow_updates = []
+        self.update_calls = 0
+        self.closed = False
+
+    def update(self) -> None:
+        self.update_calls += 1
+
+    def close(self) -> None:
+        self.closed = True
 
     def handle(self, command, tracked_heads, timestamp):
         self.handled.append((command, tracked_heads, timestamp))
