@@ -1,4 +1,4 @@
-VOICE_PHRASES = (
+VOICE_PHRASES: tuple[str, ...] = (
     "take off",
     "land",
     "follow me",
