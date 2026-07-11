@@ -39,3 +39,6 @@ class GestureDetector:
             detections.append(GestureDetection(gesture_name, confidence, hand_landmarks, raw_gestures))           
         
         return detections
+
+    def close(self) -> None:
+        self.recognizer.close()

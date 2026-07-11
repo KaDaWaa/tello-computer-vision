@@ -36,3 +36,6 @@ class HeadDetector:
 
         results = self.detector.detect(image)
         return [BBox.from_detection(detection) for detection in results.detections] or []
+
+    def close(self) -> None:
+        self.detector.close()
