@@ -16,7 +16,7 @@ from pathlib import Path
 
 from core.voice.phrases import VOICE_PHRASES
 
-model_path = "core\\voice\\models\\vosk-model-small-en-us-0.15"
+model_path = Path("core/voice/models/vosk-model-small-en-us-0.15")
 
 
 class VoiceListener:
