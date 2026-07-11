@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import queue
 import threading
+import logging
 import sounddevice as sd
 from vosk import Model, KaldiRecognizer
 from pathlib import Path
@@ -98,6 +99,6 @@ class VoiceListener:
                             self._command_queue.put(text)
         except Exception as exc:
             # If the audio device fails don't crash the whole app
-            print(f"[VoiceListener] audio error: {exc}")
+            logging.error(f"[VoiceListener] audio error: {exc}")
         finally:
             self._listening = False
