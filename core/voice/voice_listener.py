@@ -25,6 +25,7 @@ class VoiceListener:
     Initialized lazily (model loaded once, mic starts on toggle)
     """
 
+    BLOCK_SIZE = 4000
     GRAMMAR = json.dumps([*VOICE_PHRASES, "[unk]"])
 
     def __init__(self, sample_rate: int = 16000):
@@ -84,12 +85,12 @@ class VoiceListener:
         try:
             with sd.RawInputStream(
                 samplerate=self._sample_rate,
-                blocksize=4000,
+                blocksize=self.BLOCK_SIZE,
                 dtype="int16",
                 channels=1,
             ) as stream:
                 while self._listening:
-                    data, _ = stream.read(4000)
+                    data, _ = stream.read(self.BLOCK_SIZE)
                     if self._recognizer.AcceptWaveform(bytes(data)):
                         result = json.loads(self._recognizer.Result())
                         text = result.get("text", "").strip()
