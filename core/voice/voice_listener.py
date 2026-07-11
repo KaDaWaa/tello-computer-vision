@@ -1,6 +1,6 @@
 """Vosk-based real-time voice recognition running in a background thread.
 
-Streams microphone audio into Vosk with a restricted grammar so only
+This module streams microphone audio into Vosk with a restricted grammar so only
 valid drone commands are recognized.  Results are pushed into a
 thread-safe queue that the main loop can poll every frame.
 """
@@ -10,13 +10,14 @@ from __future__ import annotations
 import json
 import queue
 import threading
+import logging
 import sounddevice as sd
 from vosk import Model, KaldiRecognizer
 from pathlib import Path
 
 from core.voice.phrases import VOICE_PHRASES
 
-model_path = "core\\voice\\models\\vosk-model-small-en-us-0.15"
+MODEL_PATH = Path("core/voice/models/vosk-model-small-en-us-0.15")
 
 
 class VoiceListener:
@@ -25,10 +26,13 @@ class VoiceListener:
     Initialized lazily (model loaded once, mic starts on toggle)
     """
 
-    GRAMMAR = json.dumps([*VOICE_PHRASES, "[unk]"])
+    BLOCK_SIZE = 4000
+    UNKNOWN_TOKEN = "[unk]"
+    GRAMMAR = json.dumps([*VOICE_PHRASES, UNKNOWN_TOKEN])
 
     def __init__(self, sample_rate: int = 16000):
-        self._model = Model(model_path)
+        # Note: Model loading is a synchronous, CPU-intensive blocking operation.
+        self._model = Model(str(MODEL_PATH))
         self._recognizer = KaldiRecognizer(self._model, sample_rate, self.GRAMMAR)
         self._sample_rate = sample_rate
         self._command_queue: queue.Queue[str] = queue.Queue()
@@ -57,6 +61,7 @@ class VoiceListener:
         """Signal the background thread to stop."""
         self._listening = False
         self._stop_event.set()
+        self._thread = None
 
     def poll_command(self) -> str | None:
         """Non-blocking poll for the next recognized command.
@@ -69,7 +74,7 @@ class VoiceListener:
             return None
 
     def drain(self) -> None:
-        """Discard any queued commands (useful when toggling mode off)."""
+        """Discard queued commands to prevent old commands from executing on mode toggle."""
         while not self._command_queue.empty():
             try:
                 self._command_queue.get_nowait()
@@ -84,19 +89,21 @@ class VoiceListener:
         try:
             with sd.RawInputStream(
                 samplerate=self._sample_rate,
-                blocksize=4000,
+                blocksize=self.BLOCK_SIZE,
                 dtype="int16",
                 channels=1,
             ) as stream:
-                while self._listening:
-                    data, _ = stream.read(4000)
+                while not self._stop_event.is_set():
+                    data, overflowed = stream.read(self.BLOCK_SIZE)
+                    if overflowed:
+                        logging.warning("[VoiceListener] Audio stream buffer overflow")
                     if self._recognizer.AcceptWaveform(bytes(data)):
                         result = json.loads(self._recognizer.Result())
                         text = result.get("text", "").strip()
-                        if text and text != "[unk]":
+                        if text and text != self.UNKNOWN_TOKEN:
                             self._command_queue.put(text)
         except Exception as exc:
             # If the audio device fails don't crash the whole app
-            print(f"[VoiceListener] audio error: {exc}")
+            logging.error(f"[VoiceListener] audio error: {exc}")
         finally:
             self._listening = False

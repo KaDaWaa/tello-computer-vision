@@ -129,6 +129,7 @@ def _render_frame(
 
 
 def _read_key() -> int:
+    """Read a keyboard event from OpenCV GUI and mask to 8-bit."""
     return cv2.waitKey(1) & 0xFF
 
 
