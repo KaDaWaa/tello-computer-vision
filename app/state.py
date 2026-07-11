@@ -23,16 +23,25 @@ class State:
     def toggle_mode(self):
         """Switches the control mode between GESTURES and VOICE_COMMANDS.
         
-        Allowed while IDLE or FLYING (not while FOLLOWING, TAKING_OFF, or LANDING).
+        Allowed while IDLE, FLYING, or FOLLOWING.
         """
-        if self.current_state not in (states.IDLE, states.FLYING):
-            return
-        if self.control_mode == control_mode.GESTURES:
-            self.control_mode = control_mode.VOICE_COMMANDS
-        else:
-            self.control_mode = control_mode.GESTURES
-            self.voice_listening = False
-            self.last_voice_command = ""
+        next_mode = (
+            control_mode.VOICE_COMMANDS
+            if self.control_mode == control_mode.GESTURES
+            else control_mode.GESTURES
+        )
+        self.set_control_mode(next_mode)
+
+    def set_control_mode(self, mode: control_mode) -> bool:
+        if self.current_state not in (
+            states.IDLE,
+            states.FLYING,
+            states.FOLLOWING,
+        ):
+            return False
+
+        self.control_mode = mode
+        return True
 
     def is_voice_mode(self) -> bool:
         return self.control_mode == control_mode.VOICE_COMMANDS

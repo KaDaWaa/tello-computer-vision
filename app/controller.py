@@ -33,23 +33,17 @@ class _PID:
 
 
 class FollowController:
-    CLOSED_FIST_GESTURES = {"closed_fist", "closedfist", "fist"}
-    OPEN_HAND_GESTURES = {"open_palm", "open_hand", "openhand", "palm"}
-    FLIP_GESTURES: set[str] = set()
-    LAND_GESTURES = {"victory", "peace", "v_sign", "v_sign_hand", "v_sign_gesture"}
+    CLOSED_FIST_GESTURES = {"fist"}
+    OPEN_HAND_GESTURES = {"stop"}
+    FLIP_GESTURES= {"grip"}
+    LAND_GESTURES = {"call"}
     MOVE_GESTURES = {
-        "thumb_up": ("up", 30),
-        "thumbs_up": ("up", 30),
-        "thumb_down": ("down", 30),
-        "thumbs_down": ("down", 30),
-        "pointing_up": ("forward", 30),
-        "point_up": ("forward", 30),
-        "pointing_down": ("back", 30),
-        "point_down": ("back", 30),
-        "pointing_left": ("left", 30),
-        "point_left": ("left", 30),
-        "pointing_right": ("right", 30),
-        "point_right": ("right", 30),
+        "like": ("up", 30),
+        "dislike": ("down", 30),
+        "one": ("forward", 30),
+        "peace": ("back", 30),
+        "three2": ("left", 30),
+        "four": ("right", 30),
     }
     TRANSITION_COOLDOWN_SECONDS = 0.45
     REQUIRED_STABLE_FRAMES = 3
