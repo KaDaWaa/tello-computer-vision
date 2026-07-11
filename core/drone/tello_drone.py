@@ -33,10 +33,7 @@ class TelloDrone(BaseDrone):
             
 
     def move(self, direction, distance):
-        try:
-            self.tello.move(direction, distance)
-        except Exception as exc:
-            print(f"Tello move '{direction} {distance}' failed: {exc}")
+        self.tello.move(direction, distance)
 
     def rotate(self, angle):
         if angle >= 0:
@@ -45,10 +42,7 @@ class TelloDrone(BaseDrone):
             self.tello.rotate_counter_clockwise(abs(angle))
 
     def flip(self, direction):
-        try:
-            self.tello.flip(direction)
-        except Exception as exc:
-            print(f"Tello flip '{direction}' failed: {exc}")
+        self.tello.flip(direction)
 
     def send_rc_control(self, left_right_velocity: int, forward_backward_velocity: int, up_down_velocity: int, yaw_velocity: int):
         self.tello.send_rc_control(left_right_velocity, forward_backward_velocity, up_down_velocity, yaw_velocity)
