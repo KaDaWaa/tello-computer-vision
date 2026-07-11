@@ -14,7 +14,9 @@ import sounddevice as sd
 from vosk import Model, KaldiRecognizer
 from pathlib import Path
 
-model_path = Path(__file__).resolve().parent / "vosk-model-small-en-us-0.15"
+from core.voice.phrases import VOICE_PHRASES
+
+model_path = "core\\voice\\models\\vosk-model-small-en-us-0.15"
 
 
 class VoiceListener:
@@ -23,25 +25,7 @@ class VoiceListener:
     Initialized lazily (model loaded once, mic starts on toggle)
     """
 
-    GRAMMAR = json.dumps(
-        [
-            "take off",
-            "land",
-            "follow me",
-            "stop following",
-            "stop",
-            "flip",
-            "go up",
-            "go down",
-            "go left",
-            "go right",
-            "go forward",
-            "go back",
-            "come closer",
-            "go away",
-            "[unk]",  # catch-all for unrecognized speech
-        ]
-    )
+    GRAMMAR = json.dumps([*VOICE_PHRASES, "[unk]"])
 
     def __init__(self, sample_rate: int = 16000):
         self._model = Model(model_path)
