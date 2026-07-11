@@ -72,7 +72,7 @@ class VoiceListener:
             return None
 
     def drain(self) -> None:
-        """Discard any queued commands (useful when toggling mode off)."""
+        """Discard queued commands to prevent old commands from executing on mode toggle."""
         while not self._command_queue.empty():
             try:
                 self._command_queue.get_nowait()
