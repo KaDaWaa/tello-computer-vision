@@ -56,6 +56,7 @@ class FlightController:
         self.post_flip_lock_seconds = post_flip_lock_seconds
         self._next_action_allowed_timestamp = float("-inf")
         self._flight_actions_locked_until = float("-inf")
+        self.last_rejection_reason: str | None = None
 
     def handle(
         self,
@@ -65,6 +66,7 @@ class FlightController:
     ) -> bool:
         """Execute a flight command and report whether it was accepted."""
 
+        self.last_rejection_reason = None
         if command.type not in self.FLIGHT_COMMANDS:
             raise ValueError(
                 f"{command.type.value} is an application command, not a flight command"
@@ -72,8 +74,10 @@ class FlightController:
 
         now = timestamp if timestamp is not None else time()
         if self._is_post_flip_locked(command, now):
+            self.last_rejection_reason = "flip recovery in progress"
             return False
         if self._is_action_cooldown_locked(command, now):
+            self.last_rejection_reason = "command cooldown"
             return False
 
         executed = self._dispatch(command, tracked_heads, now)
@@ -116,7 +120,7 @@ class FlightController:
     ) -> bool:
         if command.type == CommandType.TAKE_OFF:
             if not self.state.is_idle():
-                return False
+                return self._reject("drone is not idle")
             self.state.start_takeoff()
             self.drone.takeoff()
             self.state.finish_takeoff()
@@ -124,7 +128,7 @@ class FlightController:
 
         if command.type == CommandType.LAND:
             if not (self.state.is_flying() or self.state.is_following()):
-                return False
+                return self._reject("drone is not airborne")
             if self.state.is_following():
                 self.follow_controller.stop(self.drone, now)
                 self.state.release_follow()
@@ -135,23 +139,23 @@ class FlightController:
 
         if command.type == CommandType.START_FOLLOW:
             if not self.state.is_flying():
-                return False
+                return self._reject(self._flight_state_rejection())
             target = self._select_follow_target(tracked_heads)
             if target is None:
-                return False
+                return self._reject("no tracked target")
             self.follow_controller.reset()
             self.state.start_follow(target.id)
             return True
 
         if command.type == CommandType.STOP_FOLLOW:
             if not self.state.is_following():
-                return False
+                return self._reject("drone is not following")
             self.follow_controller.stop(self.drone, now)
             self.state.release_follow()
             return True
 
         if not self.state.is_flying():
-            return False
+            return self._reject(self._flight_state_rejection())
 
         if command.type == CommandType.MOVE:
             self.drone.move(command.direction.value, command.amount)
@@ -171,6 +175,15 @@ class FlightController:
             return True
 
         return False
+
+    def _reject(self, reason: str) -> bool:
+        self.last_rejection_reason = reason
+        return False
+
+    def _flight_state_rejection(self) -> str:
+        if self.state.is_idle():
+            return "take off first"
+        return f"unavailable while {self.state.current_state.value}"
 
     def _is_post_flip_locked(
         self,

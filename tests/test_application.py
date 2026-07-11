@@ -201,9 +201,11 @@ def test_photo_countdown_does_not_block_flight_commands() -> None:
     due = app.process_frame(frame(3), timestamp=13.0)
 
     assert first.photo_scheduled
+    assert first.photo_seconds_remaining == 3.0
     assert first.executed_command == AppCommand.move(Direction.LEFT, 30)
     assert before_due.photo_path is None
     assert due.photo_path == Path("photo.jpg")
+    assert due.photo_saved
     assert photos.captures[0][1] == 13.0
     assert np.all(photos.captures[0][0] == 3)
     assert [call[0] for call in flight.handled] == [
@@ -247,3 +249,33 @@ def test_close_releases_input_vision_and_photo_resources() -> None:
     assert vision.closed
     assert photos.closed
     assert not state.voice_listening
+
+
+def test_blocked_command_feedback_explains_rejection() -> None:
+    app, _, _, _, flight, _ = make_application(voice_commands=("go left",))
+    flight.handle = lambda command, tracked_heads, timestamp: False
+    flight.last_rejection_reason = "take off first"
+    app.start()
+
+    result = app.process_frame(frame(), timestamp=10.0)
+
+    assert result.executed_command is None
+    assert result.detected_input == "go left"
+    assert result.command_feedback.status == "blocked"
+    assert result.command_feedback.detail == "take off first"
+    assert result.command_feedback.command.description == "MOVE LEFT 30 cm"
+    app.close()
+
+
+def test_command_feedback_remains_visible_for_two_seconds() -> None:
+    app, _, _, _, _, _ = make_application(voice_commands=("take off",))
+    app.start()
+
+    first = app.process_frame(frame(), timestamp=10.0)
+    visible = app.process_frame(frame(), timestamp=11.99)
+    expired = app.process_frame(frame(), timestamp=12.0)
+
+    assert first.command_feedback.status == "executed"
+    assert visible.command_feedback == first.command_feedback
+    assert expired.command_feedback is None
+    app.close()

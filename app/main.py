@@ -52,6 +52,7 @@ def run_application(
 ) -> int:
     fps_counter = FPSCounter()
     battery = _BatteryMonitor()
+    show_debug = True
 
     with ExitStack() as cleanup:
         cleanup.callback(cv2.destroyAllWindows)
@@ -66,19 +67,31 @@ def run_application(
         while True:
             frame = camera.read()
             if frame is None:
-                if _quit_requested():
+                key = _read_key()
+                if key == ord("q"):
                     break
+                if key == ord("d"):
+                    show_debug = not show_debug
                 continue
 
             now = time()
             result = application.process_frame(frame, now)
             battery_value = battery.update(drone, now)
             fps = fps_counter.tick()
-            _render_frame(result, application.state, battery_value, fps)
-            cv2.imshow("Tello Computer Vision", result.vision.frame)
+            display = _render_frame(
+                result,
+                application.state,
+                battery_value,
+                fps,
+                show_debug,
+            )
+            cv2.imshow("Tello Computer Vision", display)
 
-            if _quit_requested():
+            key = _read_key()
+            if key == ord("q"):
                 break
+            if key == ord("d"):
+                show_debug = not show_debug
 
     return 0
 
@@ -88,8 +101,10 @@ def _render_frame(
     state: State,
     battery: int | None,
     fps: float,
-) -> None:
-    render(
+    show_debug: bool,
+):
+    feedback = result.command_feedback
+    return render(
         result.vision.frame,
         result.vision.tracked_heads,
         result.vision.gestures,
@@ -100,11 +115,18 @@ def _render_frame(
         control_mode=state.control_mode.value,
         voice_listening=state.voice_listening,
         last_voice_cmd=state.last_voice_command,
+        detected_input=result.detected_input,
+        command_text=(feedback.command.description if feedback else None),
+        command_status=(feedback.status if feedback else None),
+        command_detail=(feedback.detail if feedback else None),
+        photo_seconds_remaining=result.photo_seconds_remaining,
+        photo_saved=result.photo_saved,
+        show_debug=show_debug,
     )
 
 
-def _quit_requested() -> bool:
-    return cv2.waitKey(1) & 0xFF == ord("q")
+def _read_key() -> int:
+    return cv2.waitKey(1) & 0xFF
 
 
 def _land_before_shutdown(application: ApplicationCoordinator) -> None:

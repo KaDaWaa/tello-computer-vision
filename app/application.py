@@ -34,11 +34,22 @@ class PhotoOutput(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
+class CommandFeedback:
+    command: AppCommand
+    status: str
+    detail: str = ""
+
+
+@dataclass(frozen=True, slots=True)
 class ApplicationFrame:
     vision: VisionFrame
     executed_command: AppCommand | None
     photo_scheduled: bool
     photo_path: Path | None
+    detected_input: str | None
+    command_feedback: CommandFeedback | None
+    photo_seconds_remaining: float | None
+    photo_saved: bool
 
 
 class ApplicationCoordinator:
@@ -67,6 +78,9 @@ class ApplicationCoordinator:
         self.gesture_handler = gesture_handler or GestureHandler()
         self.photo_capture = photo_capture or PhotoCapture()
         self._photo_due_at: float | None = None
+        self._photo_saved_until = float("-inf")
+        self._last_feedback: CommandFeedback | None = None
+        self._feedback_expires_at = float("-inf")
         self._started = False
         self._closed = False
 
@@ -92,16 +106,25 @@ class ApplicationCoordinator:
 
         now = timestamp if timestamp is not None else time()
         vision = self.vision_pipeline.process(frame, now)
-        commands = self._collect_commands(vision)
+        commands, detected_input = self._collect_commands(vision)
 
         photo_scheduled = False
         for command in commands:
             if command.type == CommandType.TAKE_PHOTO:
                 photo_scheduled = self._schedule_photo(command, now) or photo_scheduled
 
-        executed_command = self._execute_highest_priority_command(
+        executed_command, attempted_command, rejection_reason = (
+            self._execute_highest_priority_command(
             commands,
             vision,
+            now,
+        )
+        )
+        self._update_feedback(
+            executed_command,
+            attempted_command,
+            rejection_reason,
+            photo_scheduled,
             now,
         )
         self.flight_controller.update_follow(
@@ -111,6 +134,8 @@ class ApplicationCoordinator:
             now,
         )
         photo_path = self._capture_photo_if_due(vision.frame, now)
+        if photo_path is not None:
+            self._photo_saved_until = now + 2.0
         self.state.voice_listening = self.voice_listener.is_listening
 
         return ApplicationFrame(
@@ -118,6 +143,12 @@ class ApplicationCoordinator:
             executed_command=executed_command,
             photo_scheduled=photo_scheduled,
             photo_path=photo_path,
+            detected_input=detected_input,
+            command_feedback=(
+                self._last_feedback if now < self._feedback_expires_at else None
+            ),
+            photo_seconds_remaining=self._photo_seconds_remaining(now),
+            photo_saved=now < self._photo_saved_until,
         )
 
     def close(self) -> None:
@@ -129,28 +160,37 @@ class ApplicationCoordinator:
         self.vision_pipeline.close()
         self.photo_capture.close()
 
-    def _collect_commands(self, vision: VisionFrame) -> list[AppCommand]:
-        commands = self._collect_voice_commands()
+    def _collect_commands(
+        self,
+        vision: VisionFrame,
+    ) -> tuple[list[AppCommand], str | None]:
+        commands, detected_input = self._collect_voice_commands()
 
         if self.state.control_mode == control_mode.GESTURES:
+            if vision.control_gesture_name:
+                detected_input = vision.control_gesture_name
             gesture_command = self.gesture_handler.handle(
                 vision.control_gesture_name
             )
             if gesture_command is not None:
                 commands.append(gesture_command)
 
-        return commands
+        return commands, detected_input
 
-    def _collect_voice_commands(self) -> list[AppCommand]:
+    def _collect_voice_commands(
+        self,
+    ) -> tuple[list[AppCommand], str | None]:
         commands = []
+        detected_input = None
         while True:
             recognized_text = self.voice_listener.poll_command()
             if recognized_text is None:
-                return commands
+                return commands, detected_input
 
             normalized_text = self.audio_handler.normalize_text(recognized_text)
             if normalized_text:
                 self.state.last_voice_command = normalized_text
+                detected_input = normalized_text
 
             command = self.audio_handler.handle(recognized_text)
             if command is not None and self._voice_command_is_allowed(command):
@@ -171,7 +211,7 @@ class ApplicationCoordinator:
         commands: list[AppCommand],
         vision: VisionFrame,
         now: float,
-    ) -> AppCommand | None:
+    ) -> tuple[AppCommand | None, AppCommand | None, str | None]:
         foreground_commands = sorted(
             (
                 command
@@ -182,18 +222,30 @@ class ApplicationCoordinator:
             reverse=True,
         )
 
+        first_rejected_command = None
+        first_rejection_reason = None
         for command in foreground_commands:
             if command.type == CommandType.SET_CONTROL_MODE:
                 if self._set_control_mode(command.mode):
-                    return command
+                    return command, command, None
+                if first_rejected_command is None:
+                    first_rejected_command = command
+                    first_rejection_reason = "mode change unavailable"
                 continue
             if self.flight_controller.handle(
                 command,
                 vision.tracked_heads,
                 now,
             ):
-                return command
-        return None
+                return command, command, None
+            if first_rejected_command is None:
+                first_rejected_command = command
+                first_rejection_reason = getattr(
+                    self.flight_controller,
+                    "last_rejection_reason",
+                    None,
+                ) or "command blocked"
+        return None, first_rejected_command, first_rejection_reason
 
     def _set_control_mode(self, mode: control_mode | None) -> bool:
         if mode is None or not self.state.set_control_mode(mode):
@@ -216,4 +268,33 @@ class ApplicationCoordinator:
             return None
         self._photo_due_at = None
         return self.photo_capture.capture(frame, now)
+
+    def _update_feedback(
+        self,
+        executed: AppCommand | None,
+        attempted: AppCommand | None,
+        rejection_reason: str | None,
+        photo_scheduled: bool,
+        now: float,
+    ) -> None:
+        feedback = None
+        if executed is not None:
+            feedback = CommandFeedback(executed, "executed")
+        elif attempted is not None:
+            feedback = CommandFeedback(
+                attempted,
+                "blocked",
+                rejection_reason or "command blocked",
+            )
+        elif photo_scheduled:
+            feedback = CommandFeedback(AppCommand.take_photo(), "scheduled")
+
+        if feedback is not None:
+            self._last_feedback = feedback
+            self._feedback_expires_at = now + 2.0
+
+    def _photo_seconds_remaining(self, now: float) -> float | None:
+        if self._photo_due_at is None:
+            return None
+        return max(0.0, self._photo_due_at - now)
 

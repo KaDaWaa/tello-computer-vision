@@ -83,7 +83,13 @@ class RuntimeApplication:
             tracked_heads=[],
             gestures=[],
         )
-        return SimpleNamespace(vision=vision)
+        return SimpleNamespace(
+            vision=vision,
+            command_feedback=None,
+            detected_input=None,
+            photo_seconds_remaining=None,
+            photo_saved=False,
+        )
 
     def close(self) -> None:
         self.events.append("application.close")

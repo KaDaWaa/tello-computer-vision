@@ -118,6 +118,30 @@ class AppCommand:
             CommandType.TAKE_PHOTO: CommandPriority.BACKGROUND,
         }[self.type]
 
+    @property
+    def description(self) -> str:
+        if self.type == CommandType.MOVE:
+            return f"MOVE {self.direction.value.upper()} {self.amount} cm"
+        if self.type == CommandType.ROTATE:
+            return f"ROTATE {self.direction.value.upper()} {self.amount} deg"
+        if self.type == CommandType.FLIP:
+            return f"FLIP {self.direction.value.upper()}"
+        if self.type == CommandType.SET_CONTROL_MODE:
+            mode = (
+                "VOICE"
+                if self.mode == control_mode.VOICE_COMMANDS
+                else "GESTURE"
+            )
+            return f"SWITCH TO {mode} MODE"
+        if self.type == CommandType.TAKE_PHOTO:
+            return f"TAKE PHOTO IN {self.delay_seconds:g}s"
+        return {
+            CommandType.TAKE_OFF: "TAKE OFF",
+            CommandType.LAND: "LAND",
+            CommandType.START_FOLLOW: "START FOLLOW",
+            CommandType.STOP_FOLLOW: "STOP FOLLOW",
+        }[self.type]
+
     @classmethod
     def take_off(cls) -> AppCommand:
         return cls(CommandType.TAKE_OFF)
