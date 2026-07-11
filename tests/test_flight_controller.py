@@ -31,6 +31,7 @@ def test_move_executes_only_while_flying() -> None:
 
     assert not controller.handle(command, [], timestamp=10.0)
     assert drone.moves == []
+    assert controller.last_rejection_reason == "take off first"
 
     controller.state.set_flying()
     assert controller.handle(command, [], timestamp=11.0)
@@ -79,6 +80,7 @@ def test_post_flip_lock_blocks_flight_actions_for_three_seconds() -> None:
     assert controller.handle(AppCommand.flip(), [], timestamp=10.0)
     assert not controller.handle(move, [], timestamp=12.99)
     assert drone.moves == []
+    assert controller.last_rejection_reason == "flip recovery in progress"
 
     assert controller.handle(move, [], timestamp=13.0)
     assert drone.moves == [("up", 30)]

@@ -79,3 +79,20 @@ def test_commands_are_immutable() -> None:
 
     with pytest.raises((AttributeError, TypeError)):
         command.amount = 30
+
+
+@pytest.mark.parametrize(
+    ("command", "description"),
+    [
+        (AppCommand.take_off(), "TAKE OFF"),
+        (AppCommand.move(Direction.LEFT, 30), "MOVE LEFT 30 cm"),
+        (AppCommand.rotate(Direction.RIGHT, 90), "ROTATE RIGHT 90 deg"),
+        (AppCommand.flip(Direction.BACK), "FLIP BACK"),
+        (AppCommand.take_photo(3), "TAKE PHOTO IN 3s"),
+    ],
+)
+def test_command_has_human_readable_description(
+    command: AppCommand,
+    description: str,
+) -> None:
+    assert command.description == description
