@@ -76,7 +76,10 @@ def run_application(
 
             now = time()
             result = application.process_frame(frame, now)
-            battery_value = battery.update(drone, now)
+            if application.flight_controller.has_pending_action:
+                battery_value = battery.value
+            else:
+                battery_value = battery.update(drone, now)
             fps = fps_counter.tick()
             display = _render_frame(
                 result,
@@ -130,6 +133,7 @@ def _read_key() -> int:
 
 
 def _land_before_shutdown(application: ApplicationCoordinator) -> None:
+    application.flight_controller.wait_for_pending_action()
     state = application.state
     if state.is_flying() or state.is_following():
         application.flight_controller.handle(
@@ -137,6 +141,7 @@ def _land_before_shutdown(application: ApplicationCoordinator) -> None:
             tracked_heads=[],
             timestamp=time(),
         )
+        application.flight_controller.wait_for_pending_action()
     elif not state.is_idle():
         application.flight_controller.drone.land()
 

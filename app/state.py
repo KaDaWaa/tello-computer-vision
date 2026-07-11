@@ -93,6 +93,11 @@ class State:
         if self.current_state == states.TAKING_OFF:
             self.current_state = states.FLYING
 
+    def cancel_takeoff(self):
+        if self.current_state == states.TAKING_OFF:
+            self.current_state = states.IDLE
+            self.head_target_id = None
+
     # Idle state management
     def set_idle(self):
         if self.current_state == states.LANDING:

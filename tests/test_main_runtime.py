@@ -52,6 +52,13 @@ class RuntimeFlightController:
         self.drone = drone
         self.commands = []
 
+    @property
+    def has_pending_action(self) -> bool:
+        return False
+
+    def wait_for_pending_action(self) -> None:
+        pass
+
     def handle(self, command, tracked_heads, timestamp) -> bool:
         self.commands.append(command)
         self.events.append(f"flight.{command.type.value}")
