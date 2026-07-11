@@ -91,7 +91,7 @@ class VoiceListener:
                 dtype="int16",
                 channels=1,
             ) as stream:
-                while self._listening:
+                while not self._stop_event.is_set():
                     data, _ = stream.read(self.BLOCK_SIZE)
                     if self._recognizer.AcceptWaveform(bytes(data)):
                         result = json.loads(self._recognizer.Result())
