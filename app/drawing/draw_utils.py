@@ -87,10 +87,21 @@ def _format_gestures(gesture_detections: Iterable[GestureDetection]) -> str:
     return ", ".join(unique_names) if unique_names else "none"
 
 
-def _draw_status_panel(frame, current_state: str, gesture_text: str, battery_text: str, fps_text: str):
+def _draw_status_panel(
+    frame,
+    current_state: str,
+    gesture_text: str,
+    battery_text: str,
+    fps_text: str,
+    control_mode: str = "gestures",
+    voice_listening: bool = False,
+    last_voice_cmd: str = "",
+):
     frame_height, frame_width = frame.shape[:2]
-    panel_width = max(190, int(frame_width * 0.18))
-    panel_height = 118
+    panel_width = max(220, int(frame_width * 0.22))
+    # Extra height when in voice mode to show voice info
+    is_voice = control_mode == "voice commands"
+    panel_height = 178 if is_voice else 138
     x1 = frame_width - panel_width - 10
     y1 = 10
     x2 = frame_width - 10
@@ -103,11 +114,25 @@ def _draw_status_panel(frame, current_state: str, gesture_text: str, battery_tex
     y += 23
     draw_text(frame, f"State: {current_state}", org=(x1 + 12, y), font_scale=0.48, color=(255, 220, 120), bg_color=(35, 35, 35))
     y += 20
+    # Control mode indicator
+    mode_color = (180, 120, 255) if is_voice else (120, 220, 255)
+    mode_label = "VOICE" if is_voice else "GESTURE"
+    draw_text(frame, f"Mode: {mode_label}", org=(x1 + 12, y), font_scale=0.48, color=mode_color, bg_color=(35, 35, 35))
+    y += 20
     draw_text(frame, f"Gesture: {gesture_text}", org=(x1 + 12, y), font_scale=0.48, color=(120, 220, 255), bg_color=(35, 35, 35))
     y += 20
     draw_text(frame, f"Battery: {battery_text}", org=(x1 + 12, y), font_scale=0.48, color=(120, 255, 140), bg_color=(35, 35, 35))
     y += 20
     draw_text(frame, f"FPS: {fps_text}", org=(x1 + 12, y), font_scale=0.48, color=(255, 190, 120), bg_color=(35, 35, 35))
+    # Voice-specific info
+    if is_voice:
+        y += 20
+        mic_status = "\xb7 LISTENING" if voice_listening else "  MIC OFF"
+        mic_color = (0, 255, 100) if voice_listening else (100, 100, 100)
+        draw_text(frame, mic_status, org=(x1 + 12, y), font_scale=0.48, color=mic_color, bg_color=(35, 35, 35))
+        y += 20
+        cmd_display = last_voice_cmd if last_voice_cmd else "-"
+        draw_text(frame, f"Cmd: {cmd_display}", org=(x1 + 12, y), font_scale=0.48, color=(255, 220, 255), bg_color=(35, 35, 35))
 
 def render(
     frame,
@@ -117,8 +142,11 @@ def render(
     current_state: str = "unknown",
     battery: int | None = None,
     fps: float | None = None,
+    control_mode: str = "gestures",
+    voice_listening: bool = False,
+    last_voice_cmd: str = "",
 ):
-    """Example render function to visualize tracked heads and detected gestures."""
+    """Render tracked heads, gestures, and status panel onto the frame."""
     frame_height, frame_width = frame.shape[:2]
     frame_center = (frame_width // 2, frame_height // 2)
     cv2.circle(frame, frame_center, 5, (255, 255, 255), -1)
@@ -142,4 +170,9 @@ def render(
     gesture_text = _format_gestures(gesture_detections)
     battery_text = f"{battery}%" if battery is not None else "n/a"
     fps_text = f"{fps:.1f}" if fps is not None else "n/a"
-    _draw_status_panel(frame, current_state, gesture_text, battery_text, fps_text)
+    _draw_status_panel(
+        frame, current_state, gesture_text, battery_text, fps_text,
+        control_mode=control_mode,
+        voice_listening=voice_listening,
+        last_voice_cmd=last_voice_cmd,
+    )

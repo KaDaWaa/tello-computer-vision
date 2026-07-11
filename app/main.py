@@ -1,106 +1,120 @@
-from concurrent.futures import ThreadPoolExecutor, wait
+from __future__ import annotations
+
+from contextlib import ExitStack
+from dataclasses import dataclass
+from time import time
 
 import cv2
 
-from core.drone.base_drone import BaseDrone
+from app.application import ApplicationCoordinator, ApplicationFrame
+from app.commands import AppCommand
+from app.drawing.draw_utils import FPSCounter, render
+from app.flight_controller import FlightController
+from app.state import State
 from core.camera.base_camera import BaseCamera
-from core.tracking.head_tracker import HeadTracker
-from core.vision.hand_gestures.gesture_detector import GestureDetector
-from core.vision.head_detection.head_detector import HeadDetector
+from core.drone.base_drone import BaseDrone
+from core.types import DroneType
 
-from .config import Config
-from .controller import FollowController
-from .state import State
-from core.types import DroneType, CameraType
-from app.drawing.draw_utils import draw_battery, draw_bbox, FPSCounter, draw_fps, draw_gestures, render
-from time import time, sleep
 
-def main(drone_type: DroneType = DroneType.MOCK):
+@dataclass
+class _BatteryMonitor:
+    poll_interval_seconds: float = 2.0
+    value: int | None = None
+    last_poll_timestamp: float = float("-inf")
+
+    def update(self, drone: BaseDrone, timestamp: float) -> int | None:
+        if timestamp - self.last_poll_timestamp < self.poll_interval_seconds:
+            return self.value
+        try:
+            self.value = drone.get_battery()
+        except Exception:
+            pass
+        self.last_poll_timestamp = timestamp
+        return self.value
+
+
+def main(drone_type: DroneType = DroneType.MOCK) -> int:
+    from app.config import Config
+
     config = Config(drone_type)
-    drone: BaseDrone = config.init_drone()
-    camera: BaseCamera = config.init_camera(drone) 
-
-    head_detector = HeadDetector()
-    head_tracker = HeadTracker()
-    gesture_detector = GestureDetector()
+    drone = config.init_drone()
+    camera = config.init_camera(drone)
     state = State()
-    controller = FollowController(state)
-    
-    
-    drone.connect()
-    camera.start()
-    fps_counter = FPSCounter()
+    flight_controller = FlightController(state, drone)
+    application = ApplicationCoordinator(state, flight_controller)
+    return run_application(drone, camera, application)
 
-    vision_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="VisionWorker")
-    try:
-        state.start_takeoff()
-        drone.takeoff()
-        state.finish_takeoff()
-        battery_cache = None
-        last_battery_poll = 0.0
+
+def run_application(
+    drone: BaseDrone,
+    camera: BaseCamera,
+    application: ApplicationCoordinator,
+) -> int:
+    fps_counter = FPSCounter()
+    battery = _BatteryMonitor()
+
+    with ExitStack() as cleanup:
+        cleanup.callback(cv2.destroyAllWindows)
+        cleanup.callback(drone.disconnect)
+        drone.connect()
+        cleanup.callback(camera.stop)
+        camera.start()
+        cleanup.callback(application.close)
+        application.start()
+        cleanup.callback(_land_before_shutdown, application)
+
         while True:
             frame = camera.read()
-            
             if frame is None:
+                if _quit_requested():
+                    break
                 continue
 
-            # Convert to RGB early so all processing uses consistent color format
-            if config.camera_type == CameraType.TELLO:
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-            fps_value = fps_counter.tick()
             now = time()
-            if now - last_battery_poll > 2.0:
-                try:
-                    battery_cache = drone.get_battery()
-                except Exception:
-                    pass
-                last_battery_poll = now
+            result = application.process_frame(frame, now)
+            battery_value = battery.update(drone, now)
+            fps = fps_counter.tick()
+            _render_frame(result, application.state, battery_value, fps)
+            cv2.imshow("Tello Computer Vision", result.vision.frame)
 
-            heads_task = vision_executor.submit(head_detector.detect, frame)
-            gesture_task = vision_executor.submit(gesture_detector.detect, frame)
-            wait([heads_task, gesture_task])
-            
-            head_tracker.update(heads_task.result(), now)
-            gesture_results = gesture_task.result()
-
-            for head in head_tracker.tracked_heads:
-                head.contains_gesture(gesture_results, frame.shape[1], frame.shape[0])
-
-            controller.update(
-                drone,
-                head_tracker.tracked_heads,
-                gesture_results,
-                frame.shape[1],
-                frame.shape[0],
-                now,
-            )
-            
-            
-            render(
-                frame,
-                head_tracker.tracked_heads,
-                gesture_results,
-                state.head_target_id,
-                state.current_state.value,
-                battery_cache,
-                fps_value,
-            )
-
-            cv2.imshow("Frame", frame)
-            #render(frame, head_tracker.tracked_heads, gesture_results,)
-
-            if state.is_landing():
-                drone.land()
-                state.set_idle()
+            if _quit_requested():
                 break
 
+    return 0
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-    finally:
-        if not state.is_idle():
-            state.set_idle()
-            state.start_landing()
-            drone.land()
-        camera.stop()
+
+def _render_frame(
+    result: ApplicationFrame,
+    state: State,
+    battery: int | None,
+    fps: float,
+) -> None:
+    render(
+        result.vision.frame,
+        result.vision.tracked_heads,
+        result.vision.gestures,
+        state.head_target_id,
+        state.current_state.value,
+        battery,
+        fps,
+        control_mode=state.control_mode.value,
+        voice_listening=state.voice_listening,
+        last_voice_cmd=state.last_voice_command,
+    )
+
+
+def _quit_requested() -> bool:
+    return cv2.waitKey(1) & 0xFF == ord("q")
+
+
+def _land_before_shutdown(application: ApplicationCoordinator) -> None:
+    state = application.state
+    if state.is_flying() or state.is_following():
+        application.flight_controller.handle(
+            AppCommand.land(),
+            tracked_heads=[],
+            timestamp=time(),
+        )
+    elif not state.is_idle():
+        application.flight_controller.drone.land()
+

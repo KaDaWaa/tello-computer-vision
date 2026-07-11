@@ -45,7 +45,10 @@ tello-computer-vision/
 ├── app/
 │   ├── main.py                      # Main loop: capture → detect → track → control → render
 │   ├── config.py                    # Configuration: drone type, camera source
-│   ├── controller.py                # FollowController: gesture→action mapping + PID follow
+│   ├── application.py               # Coordinates vision, input handlers, and commands
+│   ├── flight_controller.py         # Validates and executes flight commands
+│   ├── follow_controller.py         # PID-based target following
+│   ├── commands.py                  # Shared audio/gesture command model
 │   ├── state.py                     # Finite state machine (idle → taking_off → flying → following → landing)
 │   └── drawing/
 │       └── draw_utils.py            # HUD rendering: bounding boxes, landmarks, status panel
