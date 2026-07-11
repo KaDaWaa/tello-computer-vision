@@ -61,6 +61,7 @@ class VoiceListener:
         """Signal the background thread to stop."""
         self._listening = False
         self._stop_event.set()
+        self._thread = None
 
     def poll_command(self) -> str | None:
         """Non-blocking poll for the next recognized command.
