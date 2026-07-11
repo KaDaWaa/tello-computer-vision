@@ -16,7 +16,7 @@ from pathlib import Path
 
 from core.voice.phrases import VOICE_PHRASES
 
-model_path = Path("core/voice/models/vosk-model-small-en-us-0.15")
+MODEL_PATH = Path("core/voice/models/vosk-model-small-en-us-0.15")
 
 
 class VoiceListener:
@@ -28,7 +28,7 @@ class VoiceListener:
     GRAMMAR = json.dumps([*VOICE_PHRASES, "[unk]"])
 
     def __init__(self, sample_rate: int = 16000):
-        self._model = Model(model_path)
+        self._model = Model(str(MODEL_PATH))
         self._recognizer = KaldiRecognizer(self._model, sample_rate, self.GRAMMAR)
         self._sample_rate = sample_rate
         self._command_queue: queue.Queue[str] = queue.Queue()
