@@ -1,6 +1,6 @@
 """Vosk-based real-time voice recognition running in a background thread.
 
-Streams microphone audio into Vosk with a restricted grammar so only
+This module streams microphone audio into Vosk with a restricted grammar so only
 valid drone commands are recognized.  Results are pushed into a
 thread-safe queue that the main loop can poll every frame.
 """
