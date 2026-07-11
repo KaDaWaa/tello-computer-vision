@@ -31,6 +31,7 @@ class VoiceListener:
     GRAMMAR = json.dumps([*VOICE_PHRASES, UNKNOWN_TOKEN])
 
     def __init__(self, sample_rate: int = 16000):
+        # Note: Model loading is a synchronous, CPU-intensive blocking operation.
         self._model = Model(str(MODEL_PATH))
         self._recognizer = KaldiRecognizer(self._model, sample_rate, self.GRAMMAR)
         self._sample_rate = sample_rate
