@@ -176,6 +176,8 @@ def test_overlapping_flight_actions_are_rejected() -> None:
     [
         (AppCommand.take_off(), False, "idle"),
         (AppCommand.land(), True, "flying"),
+        (AppCommand.move(Direction.FORWARD), True, "flying"),
+        (AppCommand.flip(Direction.LEFT), True, "flying"),
     ],
 )
 def test_failed_async_action_restores_a_safe_state(
@@ -189,6 +191,12 @@ def test_failed_async_action_restores_a_safe_state(
 
         def land(self) -> None:
             raise RuntimeError("landing failed")
+
+        def move(self, direction: str, distance: int) -> None:
+            raise RuntimeError("move failed")
+
+        def flip(self, direction: str) -> None:
+            raise RuntimeError("flip failed")
 
     state = State()
     if initially_flying:
