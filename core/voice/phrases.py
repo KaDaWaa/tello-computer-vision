@@ -1,3 +1,5 @@
+"""Tuple of valid drone voice commands recognized by Vosk."""
+
 VOICE_PHRASES: tuple[str, ...] = (
     "take off",
     "land",
