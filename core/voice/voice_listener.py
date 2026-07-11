@@ -27,7 +27,8 @@ class VoiceListener:
     """
 
     BLOCK_SIZE = 4000
-    GRAMMAR = json.dumps([*VOICE_PHRASES, "[unk]"])
+    UNKNOWN_TOKEN = "[unk]"
+    GRAMMAR = json.dumps([*VOICE_PHRASES, UNKNOWN_TOKEN])
 
     def __init__(self, sample_rate: int = 16000):
         self._model = Model(str(MODEL_PATH))
@@ -95,7 +96,7 @@ class VoiceListener:
                     if self._recognizer.AcceptWaveform(bytes(data)):
                         result = json.loads(self._recognizer.Result())
                         text = result.get("text", "").strip()
-                        if text and text != "[unk]":
+                        if text and text != self.UNKNOWN_TOKEN:
                             self._command_queue.put(text)
         except Exception as exc:
             # If the audio device fails don't crash the whole app
