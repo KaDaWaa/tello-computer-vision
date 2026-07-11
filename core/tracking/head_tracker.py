@@ -8,7 +8,7 @@ from mediapipe.tasks.python.vision.drawing_utils import _normalized_to_pixel_coo
 from typing import Iterable
 
 def build_gesture_zone(head_bbox: BBox) -> BBox:
-    return head_bbox.shift(x_shift=-(head_bbox.width + 20)).expanded(20, 20)
+    return head_bbox.shift(x_shift=-(head_bbox.width + 30)).expanded(20, 20)
 
 @dataclass
 class TrackedHead:
@@ -19,6 +19,15 @@ class TrackedHead:
     gesture_zone: BBox
     contain_gesture: bool = False
     age: int = 0
+    ema_alpha: float = 0.8  # EMA smoothing factor (0=no smoothing, 1=only new)
+    
+    def smooth_bbox(self, new_bbox: BBox) -> BBox:
+        """Apply exponential moving average to smooth bbox across frames"""
+        smoothed_x = int(self.bbox.x * (1 - self.ema_alpha) + new_bbox.x * self.ema_alpha)
+        smoothed_y = int(self.bbox.y * (1 - self.ema_alpha) + new_bbox.y * self.ema_alpha)
+        smoothed_w = int(self.bbox.width * (1 - self.ema_alpha) + new_bbox.width * self.ema_alpha)
+        smoothed_h = int(self.bbox.height * (1 - self.ema_alpha) + new_bbox.height * self.ema_alpha)
+        return BBox(x=smoothed_x, y=smoothed_y, width=smoothed_w, height=smoothed_h)
     
     def contains_gesture(self, gestures: Iterable["GestureDetection"], image_width: int, image_height: int):
         visible_gestures = []
@@ -53,7 +62,7 @@ class TrackedHead:
 class HeadTracker:
     tracked_heads: list[TrackedHead] = field(default_factory=list)
     current_id: int = 0
-    max_distance: float = 100.0
+    max_distance: float = 200.0  # Increased from 100 to handle jitter from MediaPipe detector
     max_missing_time: float = 1.0
 
     def update(
@@ -104,8 +113,9 @@ class HeadTracker:
                 closest_raw_head is not None
                 and min_distance <= self.max_distance
             ):
-                tracked_head.bbox = closest_raw_head
-                tracked_head.center = closest_raw_head.get_center()
+                # Apply EMA smoothing to reduce jitter
+                tracked_head.bbox = tracked_head.smooth_bbox(closest_raw_head)
+                tracked_head.center = tracked_head.bbox.get_center()
                 tracked_head.last_seen = timestamp
                 tracked_head.age += 1
                 tracked_head.refresh_gesture_zone()

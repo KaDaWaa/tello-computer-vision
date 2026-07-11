@@ -74,10 +74,89 @@ def draw_battery(frame, battery: int, org=(10, 50), color=(255, 255, 0)):
     text = f"Battery: {battery}%"
     return draw_text(frame, text, org=org, font_scale=0.6, color=color, thickness=1, bg_color=(0, 0, 0))
 
-def render(frame, tracked_heads: Iterable["TrackedHead"], gesture_detections: Iterable[GestureDetection]):
-    """Example render function to visualize tracked heads and detected gestures."""
+
+def _format_gestures(gesture_detections: Iterable[GestureDetection]) -> str:
+    names = []
+    for detection in gesture_detections:
+        if detection.gesture_name:
+            names.append(detection.gesture_name.replace("_", " "))
+    unique_names = []
+    for name in names:
+        if name not in unique_names:
+            unique_names.append(name)
+    return ", ".join(unique_names) if unique_names else "none"
+
+
+def _draw_status_panel(
+    frame,
+    current_state: str,
+    gesture_text: str,
+    battery_text: str,
+    fps_text: str,
+    control_mode: str = "gestures",
+    voice_listening: bool = False,
+    last_voice_cmd: str = "",
+):
     frame_height, frame_width = frame.shape[:2]
+    panel_width = max(220, int(frame_width * 0.22))
+    # Extra height when in voice mode to show voice info
+    is_voice = control_mode == "voice commands"
+    panel_height = 178 if is_voice else 138
+    x1 = frame_width - panel_width - 10
+    y1 = 10
+    x2 = frame_width - 10
+    y2 = y1 + panel_height
+    cv2.rectangle(frame, (x1, y1), (x2, y2), (18, 18, 18), -1)
+    cv2.rectangle(frame, (x1, y1), (x2, y2), (80, 80, 80), 1)
+
+    y = y1 + 22
+    draw_text(frame, "STATUS", org=(x1 + 12, y), font_scale=0.55, color=(255, 255, 255), bg_color=(40, 40, 40))
+    y += 23
+    draw_text(frame, f"State: {current_state}", org=(x1 + 12, y), font_scale=0.48, color=(255, 220, 120), bg_color=(35, 35, 35))
+    y += 20
+    # Control mode indicator
+    mode_color = (180, 120, 255) if is_voice else (120, 220, 255)
+    mode_label = "VOICE" if is_voice else "GESTURE"
+    draw_text(frame, f"Mode: {mode_label}", org=(x1 + 12, y), font_scale=0.48, color=mode_color, bg_color=(35, 35, 35))
+    y += 20
+    draw_text(frame, f"Gesture: {gesture_text}", org=(x1 + 12, y), font_scale=0.48, color=(120, 220, 255), bg_color=(35, 35, 35))
+    y += 20
+    draw_text(frame, f"Battery: {battery_text}", org=(x1 + 12, y), font_scale=0.48, color=(120, 255, 140), bg_color=(35, 35, 35))
+    y += 20
+    draw_text(frame, f"FPS: {fps_text}", org=(x1 + 12, y), font_scale=0.48, color=(255, 190, 120), bg_color=(35, 35, 35))
+    # Voice-specific info
+    if is_voice:
+        y += 20
+        mic_status = "\xb7 LISTENING" if voice_listening else "  MIC OFF"
+        mic_color = (0, 255, 100) if voice_listening else (100, 100, 100)
+        draw_text(frame, mic_status, org=(x1 + 12, y), font_scale=0.48, color=mic_color, bg_color=(35, 35, 35))
+        y += 20
+        cmd_display = last_voice_cmd if last_voice_cmd else "-"
+        draw_text(frame, f"Cmd: {cmd_display}", org=(x1 + 12, y), font_scale=0.48, color=(255, 220, 255), bg_color=(35, 35, 35))
+
+def render(
+    frame,
+    tracked_heads: Iterable["TrackedHead"],
+    gesture_detections: Iterable[GestureDetection],
+    active_target_id: int | None = None,
+    current_state: str = "unknown",
+    battery: int | None = None,
+    fps: float | None = None,
+    control_mode: str = "gestures",
+    voice_listening: bool = False,
+    last_voice_cmd: str = "",
+):
+    """Render tracked heads, gestures, and status panel onto the frame."""
+    frame_height, frame_width = frame.shape[:2]
+    frame_center = (frame_width // 2, frame_height // 2)
+    cv2.circle(frame, frame_center, 5, (255, 255, 255), -1)
     for head in tracked_heads:
+        head_center_x, head_center_y = head.bbox.get_center()
+        head_center = (int(head_center_x), int(head_center_y))
+        line_color = (0, 255, 0) if head.id == active_target_id else (255, 180, 0) if head.contain_gesture else (0, 0, 255)
+        if head.id == active_target_id:
+            cv2.line(frame, frame_center, head_center, line_color, 2)
+        cv2.circle(frame, head_center, 4, line_color, -1)
         draw_bbox(frame, head.bbox, label_prefix=f"ID {head.id}")
         gesture_zone_color = (
             (0, 255, 0)
@@ -85,6 +164,15 @@ def render(frame, tracked_heads: Iterable["TrackedHead"], gesture_detections: It
             else (0, 0, 255)
         )
         draw_bbox(frame, head.gesture_zone, color=gesture_zone_color, thickness=1)
-        # Optionally draw gesture zones or other info related to the head
 
     draw_gestures(frame, gesture_detections)
+
+    gesture_text = _format_gestures(gesture_detections)
+    battery_text = f"{battery}%" if battery is not None else "n/a"
+    fps_text = f"{fps:.1f}" if fps is not None else "n/a"
+    _draw_status_panel(
+        frame, current_state, gesture_text, battery_text, fps_text,
+        control_mode=control_mode,
+        voice_listening=voice_listening,
+        last_voice_cmd=last_voice_cmd,
+    )

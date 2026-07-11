@@ -31,12 +31,11 @@ class HeadDetector:
         if not isinstance(image, mp.Image):
             image = mp.Image(
                 image_format=mp.ImageFormat.SRGB,
-                data=cv2.cvtColor(image, cv2.COLOR_BGR2RGB),
+                data=image
             )
 
         results = self.detector.detect(image)
-        return [BBox(x=int(detection.bounding_box.origin_x),
-                        y=int(detection.bounding_box.origin_y),
-                        width=int(detection.bounding_box.width),
-                        height=int(detection.bounding_box.height))
-                        .expanded(1.2, 1.2) for detection in results.detections] or []
+        return [BBox.from_detection(detection) for detection in results.detections] or []
+
+    def close(self) -> None:
+        self.detector.close()

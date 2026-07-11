@@ -5,7 +5,7 @@ import mediapipe as mp
 from core.vision.hand_gestures.gesture_result import GestureDetection
 
 model_path = (
-    Path(__file__).resolve().parent.parent / "models" / "mediapipe" / "gesture_recognizer.task"
+    Path(__file__).resolve().parent.parent / "models" / "mediapipe" / "trained_gesture_recognizer.task"
 )
 
 BaseOptions = mp.tasks.BaseOptions
@@ -29,7 +29,7 @@ class GestureDetector:
         
         image = mp.Image(
             image_format=mp.ImageFormat.SRGB,
-            data=cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+            data=image)
         
         results = self.recognizer.recognize(image)  
         detections = []
@@ -39,3 +39,6 @@ class GestureDetector:
             detections.append(GestureDetection(gesture_name, confidence, hand_landmarks, raw_gestures))           
         
         return detections
+
+    def close(self) -> None:
+        self.recognizer.close()
