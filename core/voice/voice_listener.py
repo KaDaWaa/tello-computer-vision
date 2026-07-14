@@ -66,12 +66,22 @@ class VoiceListener:
     def poll_command(self) -> str | None:
         """Non-blocking poll for the next recognized command.
 
-        Returns the command string or ``None`` if nothing is available.
+        Unknown Vosk tokens are removed before returning the command. Returns
+        ``None`` if no usable command is available.
         """
-        try:
-            return self._command_queue.get_nowait()
-        except queue.Empty:
-            return None
+        while True:
+            try:
+                text = self._command_queue.get_nowait()
+            except queue.Empty:
+                return None
+
+            command = " ".join(
+                token
+                for token in text.split()
+                if token.casefold() != self.UNKNOWN_TOKEN
+            )
+            if command:
+                return command
 
     def drain(self) -> None:
         """Discard queued commands to prevent old commands from executing on mode toggle."""

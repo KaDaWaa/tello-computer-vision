@@ -118,7 +118,7 @@ change the gesture before using it again.
 
 | Model label | Command |
 |---|---|
-| `like` | Move up 30 cm |
+| `call` | Move up 30 cm |
 | `dislike` | Move down 30 cm |
 | `fist` | Start following |
 | `stop` | Stop following |
@@ -128,11 +128,6 @@ change the gesture before using it again.
 | `peace` | Move right 30 cm |
 | `three2` | Rotate left 90 degrees |
 | `four` | Rotate right 90 degrees |
-| `call` | Switch to voice mode |
-| `rock` | Flip forward |
-
-The custom model can occasionally confuse `like` and `call`. This is a model
-training limitation rather than a command-routing rule.
 
 ## Flight Safety and State
 
@@ -346,5 +341,10 @@ vision components; no webcam, microphone, or Tello is required.
 Use mock mode while changing command mappings or state rules. Before real
 flight, verify battery level, propeller clearance, Wi-Fi connection, emergency
 landing, and shutdown behavior in an open indoor area.
+
+Fly over a well-lit, matte floor with visible texture and detail so the Tello's
+downward camera and infrared sensors can stabilize the drone reliably. Shiny,
+dark, or visually uniform floors can reduce positioning accuracy and cause the
+drone to drift.
 
 This project is provided as-is for educational and experimental use.

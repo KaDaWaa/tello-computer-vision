@@ -84,8 +84,6 @@ class ApplicationCoordinator:
         self._started = False
         self._closed = False
 
-        if not self.state.set_control_mode(control_mode.VOICE_COMMANDS):
-            raise ValueError("Application must be initialized in a stable state")
 
     def start(self) -> None:
         if self._closed:

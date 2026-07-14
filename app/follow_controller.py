@@ -33,11 +33,11 @@ class FollowController:
 
     RC_INTERVAL_SECONDS = 0.05
     RC_DEADBAND = 0
-    TARGET_HEAD_HEIGHT_RATIO = 0.18
+    TARGET_HEAD_HEIGHT_RATIO = 0.22
 
     def __init__(self) -> None:
-        self._yaw_pid = _PID(kp=1.6, ki=0.0, kd=0.02)
-        self._forward_pid = _PID(kp=1.6, ki=0.0, kd=0.02)
+        self._yaw_pid = _PID(kp=2.2, ki=0.0, kd=0.02)
+        self._forward_pid = _PID(kp=2.6, ki=0.0, kd=0.04)
         self._height_pid = _PID(kp=1.6, ki=0.0, kd=0.02)
         self._last_update_timestamp: float | None = None
         self._last_rc_sent_timestamp = float("-inf")
