@@ -14,7 +14,7 @@ class control_mode(Enum):
 
 class State:
     def __init__(self):
-        self.control_mode = control_mode.GESTURES
+        self.control_mode = control_mode.VOICE_COMMANDS
         self.current_state = states.IDLE
         self.head_target_id: Optional[int] = None
         self.voice_listening: bool = False
