@@ -16,7 +16,7 @@ class GestureHandler:
     REQUIRED_STABLE_FRAMES = 3
 
     COMMANDS_BY_GESTURE = {
-        "like": AppCommand.move(Direction.UP, 30),
+        "call": AppCommand.move(Direction.UP, 30),
         "dislike": AppCommand.move(Direction.DOWN, 30),
         "fist": AppCommand.start_follow(),
         "stop": AppCommand.stop_follow(),
@@ -26,8 +26,6 @@ class GestureHandler:
         "peace": AppCommand.move(Direction.RIGHT, 30),
         "three2": AppCommand.rotate(Direction.LEFT, 90),
         "four": AppCommand.rotate(Direction.RIGHT, 90),
-        "call": AppCommand.set_control_mode(control_mode.VOICE_COMMANDS),
-        "rock": AppCommand.flip(Direction.FORWARD),
     }
 
     def __init__(
